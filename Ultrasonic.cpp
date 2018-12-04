@@ -29,71 +29,71 @@
  * THE SOFTWARE.
  */
 #include <stdio.h>
-#include <string.h>
 #include <inttypes.h>
 #include "Arduino.h"
 #include "Ultrasonic.h"
 
-#ifdef STM32F4
+#define NO_ECHO 0
+const long ECHO_MAX_DIST_CM = 400l;
+const long ECHO_MAX_DIST_INCH = ECHO_MAX_DIST_CM * 29 / 74;
 
-static uint32_t MicrosDiff(uint32_t begin, uint32_t end)
-{
-	return end - begin;
-}
+#define ReadPin(x) digitalRead(x)
+#define WritePin(x) digitalWrite(x)
+#define MicrosecondsNow() micros()
+#define SetPinMode(pin, mode) pinMode(pin, mode)
+#define ON HIGH
+#define OFF LOW
+#define IN INPUT
+#define OUT OUTPUT
 
-static uint32_t pulseIn(uint32_t pin, uint32_t state, uint32_t timeout = 1000000L)
+static long pulseIn(long pin, long timeout)
 {
-	uint32_t begin = micros();
+	long begin = MicrosecondsNow();
 	
 	// wait for any previous pulse to end
-	while (digitalRead(pin)) if (MicrosDiff(begin, micros()) >= timeout) return 0;
+	while (ReadPin(pin)) if (MicrosecondsNow() - begin >= timeout) return NO_ECHO;
 	
 	// wait for the pulse to start
-	while (!digitalRead(pin)) if (MicrosDiff(begin, micros()) >= timeout) return 0;
-	uint32_t pulseBegin = micros();
+	while (!ReadPin(pin)) if (MicrosecondsNow() - begin >= timeout) return NO_ECHO;
+	long pulseBegin = MicrosecondsNow();
 	
 	// wait for the pulse to stop
-	while (digitalRead(pin)) if (MicrosDiff(begin, micros()) >= timeout) return 0;
-	uint32_t pulseEnd = micros();
+	while (ReadPin(pin)) if (MicrosecondsNow() - begin >= timeout) return NO_ECHO;
+	long pulseEnd = MicrosecondsNow();
 	
-	return MicrosDiff(pulseBegin, pulseEnd);
+	return pulseEnd - pulseBegin;
 }
-
-#endif
 
 Ultrasonic::Ultrasonic(int pin)
 {
 	_pin = pin;
 }
-/*The measured distance from the range 0 to 400 Centimeters*/
-long Ultrasonic::MeasureInCentimeters(void)
-{
-	pinMode(_pin, OUTPUT);
-	digitalWrite(_pin, LOW);
+
+long Ultrasonic::MeasureDurationMicroseconds(long timeout = ECHOTIMEMAX)
+	SetPinMode(_pin, OUT);
+	WritePin(_pin, OFF);
 	delayMicroseconds(2);
-	digitalWrite(_pin, HIGH);
+	WritePin(_pin, ON);
 	delayMicroseconds(5);
-	digitalWrite(_pin,LOW);
-	pinMode(_pin,INPUT);
-	long duration;
-	duration = pulseIn(_pin,HIGH);
-	long RangeInCentimeters;
-	RangeInCentimeters = duration/29/2;
-	return RangeInCentimeters;
+	WritePin(_pin, OFF);
+	SetPinMode(_pin,IN);
+	return pulseIn(_pin, timeout);
+}
+
+/*The measured distance from the range 0 to 400 Centimeters*/
+long Ultrasonic::MeasureInCentimeters(long timeout_distance = ECHO_MAX_DIST_CM)
+{
+	return MeasureDurationMicroseconds(timeout_distance*29*2)/29/2;
 }
 /*The measured distance from the range 0 to 157 Inches*/
-long Ultrasonic::MeasureInInches(void)
+long Ultrasonic::MeasureInInches(long timeout_distance = ECHO_MAX_DIST_INCH)
 {
-	pinMode(_pin, OUTPUT);
-	digitalWrite(_pin, LOW);
-	delayMicroseconds(2);
-	digitalWrite(_pin, HIGH);
-	delayMicroseconds(5);
-	digitalWrite(_pin,LOW);
-	pinMode(_pin,INPUT);
-	long duration;
-	duration = pulseIn(_pin,HIGH);
-	long RangeInInches;
-	RangeInInches = duration/74/2;
-	return RangeInInches;
+	return MeasureDurationMicroseconds(timeout_distance*74*2)/74/2;
 }
+
+/*Possibly add median:
+meausure N times
+remove all NO_ECHO values
+sort
+take median value
+*/

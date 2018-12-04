@@ -37,8 +37,9 @@ class Ultrasonic
 {
 	public:
 		Ultrasonic(int pin);
-		long MeasureInCentimeters(void);
-		long MeasureInInches(void);
+		long MeasureInCentimeters(long timeout_distance);
+		long MeasureInInches(long timeout_distance);
+		long MeasureDurationMicroseconds(long timeout);
 	private:
 		int _pin;//pin number of Arduino that is connected with SIG pin of Ultrasonic Ranger.
 };
